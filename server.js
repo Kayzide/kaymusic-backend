@@ -1,5 +1,5 @@
 const express = require('express');
-const { spawn } = require('child_process');
+const ytdl = require('yt-dlp-exec'); // Usa yt-dlp-exec en lugar de child_process
 const app = express();
 
 app.use((req, res, next) => {
@@ -8,31 +8,40 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/stream/:videoId', (req, res) => {
+app.get('/stream/:videoId', async (req, res) => {
   const videoId = req.params.videoId;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  res.setHeader('Content-Type', 'audio/webm'); // <- Usa el tipo correcto
+  res.setHeader('Content-Type', 'audio/webm'); // Tipo correcto para audio
 
-  const ytdlpPath = 'C:\\Users\\USER\\AppData\\Roaming\\Python\\Python313\\Scripts\\yt-dlp.exe';
-  const ytdlp = spawn(ytdlpPath, ['-f', 'bestaudio', '--no-playlist', '-o', '-', videoUrl]);
+  try {
+    const process = ytdl.exec([
+      '-f', 'bestaudio',
+      '--no-playlist',
+      '-o', '-', // Salida a stdout
+      videoUrl
+    ]);
 
-  ytdlp.stdout.pipe(res);
+    process.stdout.pipe(res);
 
-  ytdlp.stderr.on('data', (data) => {
-    console.error(`yt-dlp stderr: ${data}`);
-  });
+    process.stderr.on('data', (data) => {
+      console.error(`yt-dlp stderr: ${data}`);
+    });
 
-  ytdlp.on('error', (err) => {
-    console.error('Error al iniciar yt-dlp:', err);
-    if (!res.headersSent) res.status(500).send('Error interno al iniciar yt-dlp');
-  });
+    process.on('error', (err) => {
+      console.error('Error al iniciar yt-dlp:', err);
+      if (!res.headersSent) res.status(500).send('Error interno al iniciar yt-dlp');
+    });
 
-  ytdlp.on('close', (code) => {
-    if (code !== 0) {
-      console.error(`yt-dlp salió con código ${code}`);
-      if (!res.headersSent) res.status(500).send('Error al finalizar yt-dlp');
-    }
-  });
+    process.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`yt-dlp salió con código ${code}`);
+        if (!res.headersSent) res.status(500).send('Error al finalizar yt-dlp');
+      }
+    });
+  } catch (err) {
+    console.error('Error en la ejecución:', err);
+    if (!res.headersSent) res.status(500).send('Error al procesar la solicitud');
+  }
 });
 
 const port = 3001;
