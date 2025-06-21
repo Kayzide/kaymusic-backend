@@ -1,5 +1,5 @@
 const express = require('express');
-const ytdl = require('yt-dlp-exec'); // Usa yt-dlp-exec en lugar de child_process
+const ytdl = require('yt-dlp-exec');
 const app = express();
 
 app.use((req, res, next) => {
@@ -8,16 +8,20 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/test', (req, res) => {
+  res.send('Servidor backend de KayMusic Ultra funcionando correctamente');
+});
+
 app.get('/stream/:videoId', async (req, res) => {
   const videoId = req.params.videoId;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  res.setHeader('Content-Type', 'audio/webm'); // Tipo correcto para audio
+  res.setHeader('Content-Type', 'audio/webm');
 
   try {
     const process = ytdl.exec([
       '-f', 'bestaudio',
       '--no-playlist',
-      '-o', '-', // Salida a stdout
+      '-o', '-',
       videoUrl
     ]);
 
