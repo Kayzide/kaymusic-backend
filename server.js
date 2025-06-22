@@ -8,27 +8,35 @@ app.use((req, res, next) => {
   next();
 });
 
+// Ruta base
+app.get('/', (req, res) => {
+  res.send('Servidor backend de KayMusic Ultra activo');
+});
+
+// Ruta de prueba
 app.get('/test', (req, res) => {
   res.send('Servidor backend de KayMusic Ultra funcionando correctamente');
 });
 
+// Ruta de streaming de audio
 app.get('/stream/:videoId', async (req, res) => {
   const videoId = req.params.videoId;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  res.setHeader('Content-Type', 'audio/webm');
+  res.setHeader('Content-Type', 'audio/mpeg'); // Cambiado a MP3 para compatibilidad
 
   try {
     const process = ytdl.exec([
-      '-f', 'bestaudio',
+      '-x', // Extrae solo audio
+      '--audio-format', 'mp3', // Convierte a MP3
       '--no-playlist',
-      '-o', '-',
+      '-o', '-', // Salida a stdout
       videoUrl
-    ]);
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
     process.stdout.pipe(res);
 
     process.stderr.on('data', (data) => {
-      console.error(`yt-dlp stderr: ${data}`);
+      console.error(`yt-dlp stderr: ${data.toString()}`);
     });
 
     process.on('error', (err) => {
@@ -48,5 +56,5 @@ app.get('/stream/:videoId', async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3001; // Usa el puerto de Render
+const port = process.env.PORT || 3001;
 app.listen(port, () => console.log(`Servidor en puerto ${port}`));
