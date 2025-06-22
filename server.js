@@ -24,19 +24,34 @@ app.get('/stream/:videoId', async (req, res) => {
   res.setHeader('Accept-Ranges', 'bytes');
 
   try {
-    const info = await ytdl.getInfo(videoUrl);
+    const info = await ytdl.getInfo(videoUrl, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Cookie': 'YOUR_YOUTUBE_COOKIE_HERE' // Opcional, ver nota abajo
+        }
+      },
+      lang: 'en', // Forzar idioma para evitar bloqueos regionales
+    });
     const format = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: 'highestaudio' });
     if (!format) return res.status(404).send('Audio no disponible');
     console.log('URL del formato:', format.url.substring(0, 50) + '...');
-    ytdl(videoUrl, { filter: 'audioonly', quality: 'highestaudio' })
-      .pipe(res)
+    ytdl(videoUrl, {
+      filter: 'audioonly',
+      quality: 'highestaudio',
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      }
+    }).pipe(res)
       .on('error', (err) => {
-        console.error('Error en ytdl-core:', err);
-        if (!res.headersSent) res.status(500).send('Error al transmitir audio');
+        console.error('Error en ytdl-core:', err.message, 'Video ID:', videoId);
+        if (!res.headersSent) res.status(500).send('Error al transmitir audio: ' + err.message);
       });
   } catch (error) {
-    console.error('Error en la ejecución:', error);
-    res.status(500).send('Error al obtener el audio');
+    console.error('Error en la ejecución:', error.message, 'Video ID:', videoId);
+    res.status(500).send('Error al obtener el audio: ' + error.message);
   }
 });
 
