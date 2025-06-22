@@ -1,5 +1,5 @@
 const express = require('express');
-const ytdl = require('yt-dlp-exec');
+const ytdl = require('@distube/ytdl-core');
 const app = express();
 
 app.use((req, res, next) => {
@@ -22,37 +22,37 @@ app.get('/test', (req, res) => {
 app.get('/stream/:videoId', async (req, res) => {
   const videoId = req.params.videoId;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  res.setHeader('Content-Type', 'audio/mpeg'); // Cambiado a MP3 para compatibilidad
 
   try {
-    const process = ytdl.exec([
-      '-x', // Extrae solo audio
-      '--audio-format', 'mp3', // Convierte a MP3
-      '--no-playlist',
-      '-o', '-', // Salida a stdout
-      videoUrl
-    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const info = await ytdl.getInfo(videoUrl);
+    const audioFormats = info.formats.filter(f => f.mimeType.includes('audio'));
+    console.log('Formatos disponibles:', JSON.stringify(audioFormats.map(f => ({ mimeType: f.mimeType, quality: f.qualityLabel, url: f.url.substring(0, 50) + '...' })), null, 2));
 
-    process.stdout.pipe(res);
+    const format = ytdl.chooseFormat(audioFormats, { filter: 'audioonly', quality: 'highestaudio' });
+    if (!format) {
+      return res.status(404).send('Audio no disponible');
+    }
 
-    process.stderr.on('data', (data) => {
-      console.error(`yt-dlp stderr: ${data.toString()}`);
+    // Configurar encabezados
+    const contentType = format.mimeType || 'audio/mpeg'; // Prueba audio/mpeg o audio/webm
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    console.log('Formato seleccionado:', { mimeType: contentType, url: format.url.substring(0, 50) + '...' });
+
+    // Stream del audio con manejo de errores
+    const stream = ytdl(videoUrl, { filter: 'audioonly', quality: 'highestaudio' });
+    stream.on('info', (info, format) => {
+      console.log('Info del stream:', { mimeType: format.mimeType, bitrate: format.bitrate });
     });
-
-    process.on('error', (err) => {
-      console.error('Error al iniciar yt-dlp:', err);
-      if (!res.headersSent) res.status(500).send('Error interno al iniciar yt-dlp');
+    stream.pipe(res).on('error', (err) => {
+      console.error('Error en el stream:', err.message);
+      if (!res.headersSent) res.status(500).send('Error al transmitir audio: ' + err.message);
     });
-
-    process.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`yt-dlp salió con código ${code}`);
-        if (!res.headersSent) res.status(500).send('Error al finalizar yt-dlp');
-      }
-    });
-  } catch (err) {
-    console.error('Error en la ejecución:', err);
-    if (!res.headersSent) res.status(500).send('Error al procesar la solicitud');
+  } catch (error) {
+    console.error('Error en la ejecución:', error.message);
+    res.status(500).send('Error al obtener el audio: ' + error.message);
   }
 });
 
