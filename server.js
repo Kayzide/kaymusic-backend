@@ -48,5 +48,5 @@ app.get('/stream/:videoId', async (req, res) => {
   }
 });
 
-const port = 3001;
+const port = process.env.PORT || 3001; // Usa el puerto de Render
 app.listen(port, () => console.log(`Servidor en puerto ${port}`));
