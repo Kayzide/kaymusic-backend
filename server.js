@@ -19,26 +19,35 @@ app.get('/test', (req, res) => {
 app.get('/stream/:videoId', async (req, res) => {
   const videoId = req.params.videoId;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
   res.setHeader('Content-Type', 'audio/mpeg');
   res.setHeader('Content-Disposition', 'inline');
   res.setHeader('Accept-Ranges', 'bytes');
 
   try {
     const info = await ytdl.getInfo(videoUrl);
-    const format = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: 'highestaudio' });
-    if (!format) return res.status(404).send('Audio no disponible');
-    console.log('URL del formato:', format.url.substring(0, 50) + '...');
-    ytdl(videoUrl, { filter: 'audioonly', quality: 'highestaudio' })
-      .pipe(res)
-      .on('error', (err) => {
-        console.error('Error en ytdl-core:', err);
-        if (!res.headersSent) res.status(500).send('Error al transmitir audio');
-      });
+    const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
+    if (!format || !format.url) {
+      return res.status(404).send('Audio no disponible');
+    }
+
+    console.log('Transmitting audio from URL:', format.url.slice(0, 60) + '...');
+
+    ytdl(videoUrl, {
+      quality: 'highestaudio',
+      highWaterMark: 1 << 25 // para evitar cortes
+    })
+    .pipe(res)
+    .on('error', (err) => {
+      console.error('Error en ytdl:', err);
+      if (!res.headersSent) res.status(500).send('Error al transmitir audio');
+    });
+
   } catch (error) {
-    console.error('Error en la ejecución:', error);
-    res.status(500).send('Error al obtener el audio');
+    console.error('Error al obtener info del video:', error);
+    res.status(500).send('Error al procesar el video');
   }
 });
 
 const port = process.env.PORT || 3001;
-app.listen(port, () => console.log(`Servidor en puerto ${port}`));
+app.listen(port, () => console.log(`Servidor escuchando en puerto ${port}`));
